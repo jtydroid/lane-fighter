@@ -183,6 +183,106 @@ test('enemies spawn at the far edge and respect maxEnemies', () => {
   assert.equal(fresh.enemies[0].col, RULES.columns - 1);
 });
 
+// --- Heavy cruisers ---------------------------------------------------------
+
+const heavyAt = (lane, col, hp = RULES.heavyHits) => ({ kind: 'heavy', lane, col, hp });
+
+test('a heavy cruiser can be hit from either of its two lanes', () => {
+  for (const offset of [0, 1]) {
+    const s = playing();
+    s.enemies.push(heavyAt(s.lane - offset, 4));
+    act(s, 'fire');
+    const ev = ticks(s, 3);
+    assert.ok(ev.includes('damage'), `hit from lane offset ${offset}`);
+    assert.equal(s.enemies[0].hp, RULES.heavyHits - 1);
+  }
+});
+
+test('a heavy cruiser in neither lane is not hit', () => {
+  const s = playing();
+  s.enemies.push(heavyAt(s.lane + 1, 4)); // occupies lane+1 and lane+2
+  act(s, 'fire');
+  ticks(s, 4);
+  assert.equal(s.enemies[0].hp, RULES.heavyHits);
+});
+
+test('a heavy cruiser takes heavyHits hits and scores heavyPoints', () => {
+  const s = playing({ heavyHits: 3, heavyPoints: 5, enemyStartStepTicks: 100, enemyMinStepTicks: 100 });
+  s.enemies.push(heavyAt(s.lane, 6));
+  const events = [];
+  for (let hit = 1; hit <= 3; hit++) {
+    events.push(...act(s, 'fire'));
+    events.push(...ticks(s, 6));
+  }
+  assert.deepEqual(events.filter((e) => e !== 'fire'), ['damage', 'damage', 'heavykill']);
+  assert.equal(s.enemies.length, 0);
+  assert.equal(s.score, 5);
+});
+
+test('a heavy cruiser reaching the player in either lane crashes', () => {
+  for (const offset of [0, 1]) {
+    const s = playing();
+    s.enemies.push(heavyAt(s.lane - offset, 1));
+    assert.ok(ticks(s, RULES.enemyStartStepTicks).includes('crash'), `lane offset ${offset}`);
+  }
+});
+
+test('moving into a heavy cruiser at the player column crashes', () => {
+  const s = playing();
+  s.lane = 0;
+  s.enemies.push(heavyAt(1, 0)); // lanes 1 and 2
+  assert.ok(act(s, 'down').includes('crash'));
+});
+
+test('heavy cruisers spawn inside the board with full hit points', () => {
+  const s = createGame({ ...RULES, spawnChance: 1, heavyChance: 1, breachCostsLife: false }, 99);
+  act(s, 'fire');
+  s.lives = 99;
+  let spawned = 0;
+  for (let i = 0; i < 2000; i++) {
+    const ev = tick(s);
+    for (const e of s.enemies) {
+      assert.equal(e.kind, 'heavy');
+      assert.ok(e.lane >= 0 && e.lane <= RULES.lanes - 2, `lane ${e.lane} fits two lanes`);
+    }
+    spawned += ev.filter((e) => e === 'spawn-heavy').length;
+    const fresh = s.enemies.filter((e) => e.col === RULES.columns - 1);
+    for (const e of fresh) assert.equal(e.hp, RULES.heavyHits);
+  }
+  assert.ok(spawned > 10);
+});
+
+test('spawns never overlap a heavy cruiser at the spawn column', () => {
+  const s = createGame({ ...RULES, spawnChance: 1, heavyChance: 0.5, maxEnemies: 50, breachCostsLife: false }, 5);
+  act(s, 'fire');
+  s.lives = 99;
+  for (let i = 0; i < 3000; i++) {
+    tick(s);
+    for (let lane = 0; lane < RULES.lanes; lane++) {
+      for (let col = 0; col < RULES.columns; col++) {
+        const n = s.enemies.filter((e) =>
+          e.col === col && (e.lane === lane || (e.kind === 'heavy' && e.lane + 1 === lane))).length;
+        assert.ok(n <= 1, `cell ${lane},${col} holds ${n} enemies`);
+      }
+    }
+  }
+});
+
+test('heavyChance 0 spawns only fighters', () => {
+  const s = createGame({ ...RULES, spawnChance: 1, heavyChance: 0, breachCostsLife: false }, 3);
+  act(s, 'fire');
+  s.lives = 99;
+  ticks(s, 1000);
+  assert.ok(s.enemies.every((e) => e.kind === 'fighter'));
+});
+
+test('heavy cruiser rules are validated', () => {
+  assert.throws(() => validateRules({ ...RULES, heavyChance: -0.1 }), /heavyChance/);
+  assert.throws(() => validateRules({ ...RULES, heavyHits: 0 }), /heavyHits/);
+  assert.throws(() => validateRules({ ...RULES, lanes: 1 }), /needs lanes >= 2/);
+  assert.doesNotThrow(() => validateRules({ ...RULES, lanes: 1, heavyChance: 0 }));
+});
+
 test('same seed + same inputs = same game', () => {
   const run = (seed) => {
     const s = createGame(RULES, seed);

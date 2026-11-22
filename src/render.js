@@ -26,6 +26,20 @@ const SPRITES = {
   },
 };
 
+// Heavy cruiser hull in a tall unit box (spans two lanes). The hit-point
+// windows are cut out of the hull and lit one per remaining hit.
+function heavyHull(p, windows) {
+  p.moveTo(0.04, 0.5); p.lineTo(0.3, 0.2); p.lineTo(0.62, 0.12); p.lineTo(0.96, 0.03);
+  p.lineTo(0.8, 0.3); p.lineTo(0.8, 0.7); p.lineTo(0.96, 0.97);
+  p.lineTo(0.62, 0.88); p.lineTo(0.3, 0.8); p.closePath();
+  for (const w of windows) p.rect(...w);
+}
+
+function heavyWindows(count) {
+  const h = 0.4 / count;
+  return Array.from({ length: count }, (_, i) => [0.38, 0.3 + i * h + h * 0.14, 0.3, h * 0.72]);
+}
+
 const SEGMENTS = {
   0: 'abcdef', 1: 'bc', 2: 'abdeg', 3: 'abcdg', 4: 'bcfg',
   5: 'acdfg', 6: 'acdefg', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg', ' ': '',
@@ -58,6 +72,27 @@ export function createRenderer(canvas, rules) {
     ctx.scale(size, size);
     ctx.globalAlpha = lit ? 1 : GHOST_ALPHA;
     ctx.fill(p, 'evenodd');
+    ctx.restore();
+  }
+
+  const windows = heavyWindows(rules.heavyHits);
+
+  function heavy(e) {
+    const size = Math.min(cw, ch) * 0.92;
+    const x = PF.x + e.col * cw + (cw - size) / 2;
+    const y = PF.y + e.lane * ch + (ch - size) / 2;
+    const hull = new Path2D();
+    heavyHull(hull, windows);
+    // Remaining hit points, drawn as smaller blocks inside their windows.
+    const pips = new Path2D();
+    for (const [wx, wy, ww, wh] of windows.slice(0, Math.max(0, e.hp))) {
+      pips.rect(wx + ww * 0.14, wy + wh * 0.16, ww * 0.72, wh * 0.68);
+    }
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(size, ch + size);
+    ctx.fill(hull, 'evenodd');
+    ctx.fill(pips);
     ctx.restore();
   }
 
@@ -145,7 +180,10 @@ export function createRenderer(canvas, rules) {
     if (s.phase !== PHASE.READY && s.phase !== PHASE.OVER && !blinkOff) {
       sprite('ship', 0, s.lane, true);
     }
-    for (const e of s.enemies) sprite('enemy', e.col, e.lane, true);
+    for (const e of s.enemies) {
+      if (e.kind === 'heavy') heavy(e);
+      else sprite('enemy', e.col, e.lane, true);
+    }
     for (const x of s.shots) sprite('shot', x.col, x.lane, true);
 
     // HUD
