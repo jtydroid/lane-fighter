@@ -20,6 +20,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # tags, so frozen releases build exactly as they will in deploy
       - uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -29,4 +31,4 @@ jobs:
         run: |
           node scripts/serve.js 8080 _site &
           sleep 1
-          node scripts/check-site.js http://localhost:8080/ --expect-sha "$GITHUB_SHA"
+          node scripts/check-site.js http://localhost:8080/ --expect-sha "$(git rev-parse HEAD)" --all-releases

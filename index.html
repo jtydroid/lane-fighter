@@ -11,7 +11,7 @@
   <main class="device">
     <header class="brand">
       <span class="logo">LANE<b>FIGHTER</b></span>
-      <span class="model">LCD · <span id="version"></span></span>
+      <span class="model"><span id="variant"></span> · <span id="version"></span></span>
     </header>
 
     <div class="bezel">
@@ -33,6 +33,12 @@
       </div>
     </div>
   </main>
+
+  <nav class="picker" aria-label="Game version">
+    <label>Version <select id="release-select"><option>Latest</option></select></label>
+    <label>Rules <select id="variant-select"></select></label>
+  </nav>
+  <p class="variant-desc" id="variant-desc"></p>
 
   <p class="help">↑ ↓ / W S move · Space / Z fire · Enter pause · M sound</p>
 
