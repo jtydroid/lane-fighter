@@ -1,0 +1,32 @@
+name: CI
+
+# Runs on every pull request (e.g. an audience-voted rule change) and on
+# pushes to branches other than main. main is covered by deploy.yml.
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm test
+      - run: npm run build
+      - name: Smoke-check the built site
+        run: |
+          node scripts/serve.js 8080 _site &
+          sleep 1
+          node scripts/check-site.js http://localhost:8080/ --expect-sha "$GITHUB_SHA"

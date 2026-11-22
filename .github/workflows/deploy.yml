@@ -1,0 +1,68 @@
+name: Deploy
+
+# Every push to main is tested, built, deployed to GitHub Pages, and then
+# smoke-checked against the live URL.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; a newer push supersedes a queued one but never
+# cancels a deploy that is already running.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm test
+      - run: npm run build
+      - name: Smoke-check the built site
+        run: |
+          node scripts/serve.js 8080 _site &
+          sleep 1
+          node scripts/check-site.js http://localhost:8080/ --expect-sha "$GITHUB_SHA"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Smoke-check the live site
+        run: >
+          node scripts/check-site.js "${{ needs.deploy.outputs.page_url }}"
+          --expect-sha "$GITHUB_SHA" --retries 18
