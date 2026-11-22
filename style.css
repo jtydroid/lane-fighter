@@ -144,6 +144,38 @@ button {
 
 button:focus-visible { outline: 2px solid #f1c40f; outline-offset: 3px; }
 
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 18px;
+  font-size: 12px;
+  color: #b8bac0;
+}
+.picker label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.picker label[hidden] { display: none; }
+.picker select {
+  font: inherit;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid #4a4c53;
+  background: #25272c;
+  color: #e7e8ea;
+  max-width: 60vw;
+}
+
+.variant-desc {
+  margin: -8px 0 0;
+  max-width: 560px;
+  font-size: 12px;
+  color: #8b8d93;
+  text-align: center;
+}
+
 .help {
   margin: 0;
   font-size: 12px;

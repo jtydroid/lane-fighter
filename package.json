@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node scripts/serve.js",
     "test": "node --test",
-    "build": "node scripts/build.js",
+    "build": "node scripts/build-all.js",
     "check": "node scripts/check-site.js"
   },
   "engines": {

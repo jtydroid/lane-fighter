@@ -1,17 +1,20 @@
 name: Deploy
 
-# Every push to main is tested, built, deployed to GitHub Pages, and then
-# smoke-checked against the live URL.
+# Publishes the whole site to GitHub Pages:
+#   /            latest main
+#   /v/<tag>/    every release tag, frozen, built from its own code
+# Runs when main changes or a release tag is pushed, then smoke-checks every
+# version on the live URL.
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# One deploy at a time; a newer push supersedes a queued one but never
-# cancels a deploy that is already running.
+# One deploy at a time; never cancel one that is already running.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -20,8 +23,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.head.outputs.sha }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: main          # the root is always latest main, even on a tag push
+          fetch-depth: 0     # all history and tags, to build every release
+      - id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -31,7 +41,7 @@ jobs:
         run: |
           node scripts/serve.js 8080 _site &
           sleep 1
-          node scripts/check-site.js http://localhost:8080/ --expect-sha "$GITHUB_SHA"
+          node scripts/check-site.js http://localhost:8080/ --expect-sha "${{ steps.head.outputs.sha }}" --all-releases
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
@@ -54,7 +64,7 @@ jobs:
         uses: actions/deploy-pages@v4
 
   verify:
-    needs: deploy
+    needs: [build, deploy]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -62,7 +72,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - name: Smoke-check the live site
+      - name: Smoke-check every version on the live site
         run: >
           node scripts/check-site.js "${{ needs.deploy.outputs.page_url }}"
-          --expect-sha "$GITHUB_SHA" --retries 18
+          --expect-sha "${{ needs.build.outputs.sha }}" --all-releases --retries 18
