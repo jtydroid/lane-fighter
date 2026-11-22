@@ -4,6 +4,9 @@ const TUNES = {
   start: [[660, 70], [880, 90]],
   fire: [[1250, 22]],
   kill: [[1800, 35], [2400, 45]],
+  damage: [[700, 25], [500, 25]],
+  heavykill: [[1200, 40], [1800, 40], [2400, 40], [3200, 80]],
+  'spawn-heavy': [[260, 60], [0, 30], [260, 60]],
   move: [[520, 10]],
   hit: [[220, 120], [140, 220]],
   gameover: [[440, 160], [330, 160], [220, 320]],
@@ -34,6 +37,10 @@ export function createSound() {
       if (ctx.state === 'suspended') ctx.resume();
       let t = ctx.currentTime;
       for (const [freq, ms] of tune) {
+        if (freq === 0) { // rest
+          t += ms / 1000;
+          continue;
+        }
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'square';

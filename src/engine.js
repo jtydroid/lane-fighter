@@ -24,6 +24,8 @@ const INT_RULES = {
   speedupEveryPoints: [1, 100000],
   maxEnemies: [1, 200],
   pointsPerKill: [0, 1000],
+  heavyHits: [1, 99],
+  heavyPoints: [0, 1000],
 };
 const BOOL_RULES = ['wrapLanes', 'breachCostsLife'];
 
@@ -40,6 +42,12 @@ export function validateRules(r) {
   }
   if (typeof r.spawnChance !== 'number' || !(r.spawnChance >= 0 && r.spawnChance <= 1)) {
     errors.push(`spawnChance must be a number in [0, 1], got ${r.spawnChance}`);
+  }
+  if (typeof r.heavyChance !== 'number' || !(r.heavyChance >= 0 && r.heavyChance <= 1)) {
+    errors.push(`heavyChance must be a number in [0, 1], got ${r.heavyChance}`);
+  }
+  if (r.heavyChance > 0 && r.lanes < 2) {
+    errors.push('heavy cruisers span two lanes, so heavyChance > 0 needs lanes >= 2');
   }
   if (r.enemyMinStepTicks > r.enemyStartStepTicks) {
     errors.push('enemyMinStepTicks must not exceed enemyStartStepTicks');
@@ -172,23 +180,48 @@ export function tick(s) {
   return ev;
 }
 
+// Enemy kinds:
+//   fighter  one cell, destroyed by one hit
+//   heavy    spans `lane` and `lane + 1`, destroyed after rules.heavyHits hits
+export function occupies(e, lane, col) {
+  return e.col === col && (e.lane === lane || (e.kind === 'heavy' && e.lane + 1 === lane));
+}
+
+function enemyAt(s, lane, col) {
+  return s.enemies.findIndex((e) => occupies(e, lane, col));
+}
+
 function spawn(s, ev) {
   const r = s.rules;
   if (s.enemies.length >= r.maxEnemies) return;
   if (random(s) >= r.spawnChance) return;
-  const lane = Math.floor(random(s) * r.lanes);
   const col = r.columns - 1;
-  if (s.enemies.some((e) => e.lane === lane && e.col === col)) return;
-  s.enemies.push({ lane, col });
-  ev.push('spawn');
+  const heavy = r.heavyChance > 0 && random(s) < r.heavyChance;
+  const enemy = heavy
+    ? { kind: 'heavy', lane: Math.floor(random(s) * (r.lanes - 1)), col, hp: r.heavyHits }
+    : { kind: 'fighter', lane: Math.floor(random(s) * r.lanes), col, hp: 1 };
+  const lanes = heavy ? [enemy.lane, enemy.lane + 1] : [enemy.lane];
+  if (lanes.some((lane) => enemyAt(s, lane, col) >= 0)) return;
+  s.enemies.push(enemy);
+  ev.push(heavy ? 'spawn-heavy' : 'spawn');
 }
 
 function resolveHits(s, ev) {
   for (const shot of s.shots) {
-    const i = s.enemies.findIndex((e) => e.lane === shot.lane && e.col === shot.col);
-    if (i >= 0) {
-      s.enemies.splice(i, 1);
-      shot.dead = true;
+    const i = enemyAt(s, shot.lane, shot.col);
+    if (i < 0) continue;
+    const e = s.enemies[i];
+    shot.dead = true;
+    e.hp = (e.hp ?? 1) - 1;
+    if (e.hp > 0) {
+      ev.push('damage');
+      continue;
+    }
+    s.enemies.splice(i, 1);
+    if (e.kind === 'heavy') {
+      s.score += s.rules.heavyPoints;
+      ev.push('heavykill');
+    } else {
       s.score += s.rules.pointsPerKill;
       ev.push('kill');
     }
@@ -197,7 +230,7 @@ function resolveHits(s, ev) {
 }
 
 function checkCrash(s, ev) {
-  if (s.enemies.some((e) => e.lane === s.lane && e.col === 0)) loseLife(s, ev, 'crash');
+  if (enemyAt(s, s.lane, 0) >= 0) loseLife(s, ev, 'crash');
 }
 
 function loseLife(s, ev, cause) {

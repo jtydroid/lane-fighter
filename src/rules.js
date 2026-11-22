@@ -29,6 +29,11 @@ export const RULES = Object.freeze({
   maxEnemies: 6,
   breachCostsLife: true,  // an enemy slipping past in another lane costs a life
 
+  // Heavy cruisers: span two neighbouring lanes and take several hits.
+  heavyChance: 0.15,      // share of spawns that are heavy cruisers (0 = none)
+  heavyHits: 3,           // hits needed to destroy one
+
   // Scoring
   pointsPerKill: 1,
+  heavyPoints: 3,         // points for destroying a heavy cruiser
 });
