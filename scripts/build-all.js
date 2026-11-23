@@ -3,6 +3,8 @@
 //
 // Usage: node scripts/build-all.js [--out DIR]
 // Needs the git tags locally (in CI: actions/checkout with fetch-depth: 0).
+// $BUILD_ID (CI sets it to the run id) is stamped into releases.json so a
+// check of the live site can tell this build from an older one of the same commit.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -61,6 +63,6 @@ for (const tag of tags) {
 
 await writeFile(
   join(OUT, 'releases.json'),
-  JSON.stringify({ latest, releases }, null, 2) + '\n',
+  JSON.stringify({ build: process.env.BUILD_ID || `local-${Date.now()}`, latest, releases }, null, 2) + '\n',
 );
 console.log(`Site built: latest ${latest.version} + ${releases.length} frozen release(s)`);
