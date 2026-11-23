@@ -16,7 +16,7 @@ permissions:
 
 env:
   # Unique per run: stamped into releases.json and used as the Pages build
-  # version, so redeploying an already-deployed commit still goes live.
+  # version (scripts/deploy-pages.js), so redeploying a commit still goes live.
   BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
 
 # One deploy at a time; never cancel one that is already running.
@@ -69,19 +69,25 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      actions: read   # to find this run's Pages artifact
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     outputs:
       page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.build.outputs.sha }}   # same scripts as the build, even on a tag push
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      # Not actions/deploy-pages: it uses the commit SHA as the Pages build
+      # version, and Pages silently skips a version it already deployed.
       - id: deployment
-        uses: actions/deploy-pages@v4
+        run: node scripts/deploy-pages.js
         env:
-          # deploy-pages names the deployment after GITHUB_SHA, and Pages skips a
-          # build version it has already deployed (e.g. a tag on the commit main
-          # just deployed). A unique version makes every run actually publish.
-          GITHUB_SHA: ${{ needs.build.outputs.sha }}-${{ env.BUILD_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
 
   verify:
     needs: [build, deploy]
@@ -89,6 +95,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.build.outputs.sha }}   # same scripts as the build, even on a tag push
       - uses: actions/setup-node@v5
         with:
           node-version: 24
