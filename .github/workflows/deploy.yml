@@ -14,6 +14,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Unique per run: stamped into releases.json and used as the Pages build
+  # version (scripts/deploy-pages.js), so redeploying a commit still goes live.
+  BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+
 # One deploy at a time; never cancel one that is already running.
 concurrency:
   group: pages
@@ -32,6 +37,16 @@ jobs:
           fetch-depth: 0     # all history and tags, to build every release
       - id: head
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Check the release tag matches package.json
+        if: github.ref_type == 'tag'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="v$(git show "refs/tags/$TAG:package.json" | node -p 'JSON.parse(require("fs").readFileSync(0)).version')"
+          if [ "$version" != "$TAG" ]; then
+            echo "::error::Tag $TAG points at a commit whose package.json says $version. Bump package.json in a PR first, then tag that commit."
+            exit 1
+          fi
       - uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -41,7 +56,7 @@ jobs:
         run: |
           node scripts/serve.js 8080 _site &
           sleep 1
-          node scripts/check-site.js http://localhost:8080/ --expect-sha "${{ steps.head.outputs.sha }}" --all-releases
+          node scripts/check-site.js http://localhost:8080/ --expect-sha "${{ steps.head.outputs.sha }}" --expect-build "$BUILD_ID" --all-releases
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
@@ -54,14 +69,25 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      actions: read   # to find this run's Pages artifact
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     outputs:
       page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.build.outputs.sha }}   # same scripts as the build, even on a tag push
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      # Not actions/deploy-pages: it uses the commit SHA as the Pages build
+      # version, and Pages silently skips a version it already deployed.
       - id: deployment
-        uses: actions/deploy-pages@v4
+        run: node scripts/deploy-pages.js
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
   verify:
     needs: [build, deploy]
@@ -69,10 +95,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.build.outputs.sha }}   # same scripts as the build, even on a tag push
       - uses: actions/setup-node@v5
         with:
           node-version: 24
       - name: Smoke-check every version on the live site
         run: >
           node scripts/check-site.js "${{ needs.deploy.outputs.page_url }}"
-          --expect-sha "${{ needs.build.outputs.sha }}" --all-releases --retries 18
+          --expect-sha "${{ needs.build.outputs.sha }}" --expect-build "$BUILD_ID"
+          --all-releases --retries 18

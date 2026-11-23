@@ -1,8 +1,10 @@
 // Smoke-check a running copy of the site: the page loads, every JS module it
 // imports (transitively) is served, and the deployed build is the expected one.
 //
-// Usage: node scripts/check-site.js <base-url> [--expect-sha SHA] [--all-releases] [--retries N]
+// Usage: node scripts/check-site.js <base-url> [--expect-sha SHA] [--expect-build ID] [--all-releases] [--retries N]
 //   --expect-sha    fail unless the build at <base-url> is this commit
+//   --expect-build  fail unless releases.json is from this build (BUILD_ID), so an
+//                   older deploy of the same commit can't pass for this one
 //   --all-releases  also check every frozen release listed in releases.json
 //   --retries N     retry the whole check N times, 10s apart (waits out CDN propagation)
 
@@ -13,11 +15,12 @@ const opt = (name, fallback) => {
   return i >= 0 ? args[i + 1] : fallback;
 };
 const expectSha = opt('--expect-sha', '').slice(0, 7);
+const expectBuild = opt('--expect-build', '');
 const allReleases = args.includes('--all-releases');
 const retries = Number(opt('--retries', 0));
 
 if (!/^https?:\/\//.test(base)) {
-  console.error('Usage: node scripts/check-site.js <base-url> [--expect-sha SHA] [--all-releases] [--retries N]');
+  console.error('Usage: node scripts/check-site.js <base-url> [--expect-sha SHA] [--expect-build ID] [--all-releases] [--retries N]');
   process.exit(2);
 }
 
@@ -60,8 +63,13 @@ async function checkGame(baseUrl, sha) {
 
 async function check() {
   const lines = [`latest   ${await checkGame(base, expectSha)}`];
+  if (!allReleases && !expectBuild) return lines;
+  const { build, releases } = JSON.parse(await get(base, 'releases.json'));
+  if (expectBuild) {
+    if (build !== expectBuild) throw new Error(`live site is build ${build ?? '(none)'}, expected ${expectBuild}`);
+    lines.push(`build    ${build}`);
+  }
   if (allReleases) {
-    const { releases } = JSON.parse(await get(base, 'releases.json'));
     for (const r of releases) {
       lines.push(`${r.release.padEnd(8)} ${await checkGame(new URL(`v/${r.release}/`, base), r.sha)}`);
     }

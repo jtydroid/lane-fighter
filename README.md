@@ -50,18 +50,20 @@ turbo: { name: 'Turbo', description: 'Everything is faster.', overrides: { tickM
    gh release create v0.2.0 --target main --generate-notes
    ```
 
-The tag push triggers a deploy that adds `/v/v0.2.0/` next to the older releases.
+The tag push triggers a deploy that adds `/v/v0.2.0/` next to the older releases. The deploy fails if the tag doesn't match `package.json`'s version, so a tag without its bump PR is caught right away.
 
 ## CI/CD
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | `ci.yml` | Pull requests, pushes to non-main branches | Tests, builds the whole site, smoke-checks every version |
-| `deploy.yml` | Push to `main`, push of a `v*` tag, manual | Tests → builds → deploys to GitHub Pages → smoke-checks every version on the **live** URL until each serves its expected commit |
+| `deploy.yml` | Push to `main`, push of a `v*` tag, manual | Tests → builds → deploys to GitHub Pages → smoke-checks every version on the **live** URL until it serves this run's build |
 
 `main` is protected: changes land through PRs that pass CI, squash-merged.
 
 Each build stamps `<release>+<short sha>` onto the faceplate and writes `version.json`. The site root also gets `releases.json`, which lists every frozen release and its variants; the version picker reads it.
+
+Every deploy run has a unique build ID (`<run id>-<attempt>`). It is stamped into `releases.json` and used as the Pages build version, which `scripts/deploy-pages.js` sets in place of `actions/deploy-pages`. The live check waits for that ID. Without it, Pages would skip redeploying a commit it already has (such as a release tag on the commit `main` just deployed), and the check couldn't tell the old site from the new one.
 
 ## Layout
 
@@ -78,7 +80,8 @@ Each build stamps `<release>+<short sha>` onto the faceplate and writes `version
 | `src/version.js` | Release + version shown on the faceplate; stamped by the build. |
 | `scripts/build.js` | Builds one copy of the game. Old releases are rebuilt with their own copy, so keep its flags stable. |
 | `scripts/build-all.js` | Builds latest + every release tag into `_site/`. |
-| `scripts/check-site.js` | Smoke check: page, full module graph, expected commit. |
+| `scripts/check-site.js` | Smoke check: page, full module graph, expected commit and build. |
+| `scripts/deploy-pages.js` | Publishes the run's Pages artifact with a unique build version (CI only). |
 | `test/` | `node --test` suite. |
 
 ## Controls
