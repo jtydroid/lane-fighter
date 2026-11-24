@@ -19,6 +19,12 @@ export const VARIANTS = Object.freeze({
     description: 'Lanes wrap from top to bottom, and two shots can be in the air at once.',
     overrides: { wrapLanes: true, maxShots: 2 },
   },
+  gunner: {
+    name: 'Gunner',
+    description:
+      'From 15 points, gunships join the fight. Their guns blink before they fire back up their lane: dodge the bullet, or shoot it down.',
+    overrides: { gunshipChance: 0.25 },
+  },
 });
 
 export function resolveVariant(id) {
