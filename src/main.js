@@ -29,6 +29,7 @@ function start(variant, overrides, rules) {
   const face = document.getElementById('variant');
   face.textContent = variant.name.toUpperCase() + (custom ? '*' : '');
   face.title = custom ? 'Custom rules' : '';
+  document.getElementById('bomb-wrap').hidden = rules.bombs === 0;
 
   history.replaceState(null, '', location.pathname + rulesToSearch(variant.id, overrides, DEFAULT_VARIANT) + location.hash);
 

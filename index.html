@@ -27,9 +27,15 @@
         <button class="pill" data-action="start">START</button>
         <button class="pill" data-action="mute">SOUND</button>
       </div>
-      <div class="fire-wrap">
-        <button class="fire" data-action="fire" aria-label="Fire"></button>
-        <span class="fire-label">FIRE</span>
+      <div class="action-buttons">
+        <div class="fire-wrap bomb-wrap" id="bomb-wrap">
+          <button class="fire bomb" data-action="bomb" aria-label="Bomb"></button>
+          <span class="fire-label">BOMB</span>
+        </div>
+        <div class="fire-wrap">
+          <button class="fire" data-action="fire" aria-label="Fire"></button>
+          <span class="fire-label">FIRE</span>
+        </div>
       </div>
     </div>
   </main>
@@ -53,7 +59,7 @@
     </div>
   </section>
 
-  <p class="help">↑ ↓ / W S move · Space / Z fire · Enter pause · M sound</p>
+  <p class="help">↑ ↓ / W S move · Space / Z fire · B / X bomb · Enter pause · M sound</p>
 
   <script type="module" src="src/main.js"></script>
 </body>

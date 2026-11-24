@@ -131,6 +131,20 @@ button {
   box-shadow: 0 5px 0 #5e1b14, 0 8px 14px rgba(0,0,0,.35);
   transition: transform .04s, box-shadow .04s;
 }
+.fire-wrap[hidden] { display: none; }
+.action-buttons {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+.bomb {
+  width: 58px;
+  height: 58px;
+  background: radial-gradient(circle at 35% 30%, #5b5a60, #3a393e 55%, #1f1e22);
+  box-shadow: 0 4px 0 #111, 0 6px 10px rgba(0,0,0,.35);
+}
+.fire.bomb.pressed { transform: translateY(4px); box-shadow: 0 0 0 #111, 0 2px 4px rgba(0,0,0,.35); }
+.bomb-wrap .fire-label { color: var(--trim); }
 .fire-label {
   font-size: 11px;
   font-weight: 800;
@@ -353,6 +367,8 @@ button:focus-visible { outline: 2px solid #f1c40f; outline-offset: 3px; }
   .small-buttons { flex-direction: column; gap: 10px; }
   .dpad button { width: 58px; height: 50px; }
   .fire { width: 76px; height: 76px; }
+  .bomb { width: 50px; height: 50px; }
+  .action-buttons { gap: 10px; }
   .help { display: none; }
   .rules-panel { padding: 14px 12px; }
   .rules-status { width: 100%; }

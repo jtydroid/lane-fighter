@@ -55,8 +55,9 @@ export function playHuman(rules, seed, human = HUMAN, maxTicks = 100_000) {
 }
 
 // A sensible strategy, playing on a delayed view of the board: dodge a bullet
-// that's close in your lane, else line up with the enemy nearest to getting
-// past, else fire.
+// that's close in your lane (bombing if there's nowhere to go), bomb when two
+// or more enemies are about to get past in other lanes, else line up with the
+// enemy nearest to getting past and fire.
 function decide(s, view) {
   const r = s.rules;
   const lanesOf = (e) => (e.kind === 'heavy' ? [e.lane, e.lane + 1] : [e.lane]);
@@ -69,8 +70,12 @@ function decide(s, view) {
     return blocked(lane) ? null : dir < 0 ? 'up' : 'down';
   };
 
+  const canBomb = s.bombs > 0;
   if (view.bullets.some((b) => b.lane === s.lane && b.col <= 3)) {
-    return step(-1) ?? step(1);
+    return step(-1) ?? step(1) ?? (canBomb && r.bombClearsBullets ? 'bomb' : null);
+  }
+  if (canBomb && view.enemies.filter((e) => e.col <= 3 && !lanesOf(e).includes(s.lane)).length >= 2) {
+    return 'bomb';
   }
   const targets = view.enemies.filter((e) => e.col >= 1).sort((a, b) => a.col - b.col);
   if (!targets.length) return null;

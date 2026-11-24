@@ -12,6 +12,10 @@ The rules will change over time by audience vote. The real purpose of the projec
 | Heavy cruiser | all (from v0.2.0) | Spans two lanes, takes 3 hits (its lit windows count down), 3 points. |
 | Gunship | **Gunner** (from v0.4.0) | Appears from 15 points. Its muzzle flashes (`<`) for 3 ticks, then it fires a bullet back up its lane. Step out of the lane, or shoot the bullet down. One hit, 2 points. |
 
+## Bombs
+
+From v0.7.0, every game starts with **3 bombs** (B or X key, or the BOMB button). A bomb deals 2 hits to every enemy on screen and wipes out enemy bullets. Fighters and gunships are destroyed, and a full-health heavy cruiser is left on its last hit. Destroyed enemies score as usual. Bombs don't refill when you lose a ship. The count, damage and bullet-clearing are all rules (`bombs`, `bombHits`, `bombClearsBullets`).
+
 ## Run
 
 ```bash
@@ -88,6 +92,8 @@ Medians as of v0.6.0, from 300 games per preset:
 | Warp | 70 | 213 |
 | Gunner | 53 | 90 |
 
+The simulated player uses a bomb when two enemies are about to get past in other lanes, or when it can't dodge a bullet. With v0.7.0's 3 bombs the medians are Classic 129, Warp 235 and Gunner 109.
+
 Use it to compare rule sets, not to predict any one person's score.
 
 ## CI/CD
@@ -128,4 +134,4 @@ Every deploy run has a unique build ID (`<run id>-<attempt>`), stamped into `rel
 
 ## Controls
 
-↑/↓ or W/S move · Space/Z/J fire · Enter/P/Esc pause · M sound. On-screen buttons work on touch devices.
+↑/↓ or W/S move · Space/Z/J fire · B/X bomb · Enter/P/Esc pause · M sound. On-screen buttons work on touch devices.

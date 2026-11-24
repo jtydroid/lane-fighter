@@ -6,9 +6,9 @@ import { playHuman, summarize, HUMAN } from '../scripts/balance.js';
 
 // The simulated player is calibrated to a real player, who reached about 55
 // points on the old Classic speed ramp (v0.5.0: speed-up every 10 points, top
-// speed 2) before it became unplayable. If engine changes shift this, the
+// speed 2, no bombs) before it became unplayable. If engine changes shift this, the
 // balance numbers are no longer comparable, so recalibrate HUMAN.
-const OLD_CLASSIC = { ...RULES, speedupEveryPoints: 10, enemyMinStepTicks: 2 };
+const OLD_CLASSIC = { ...RULES, speedupEveryPoints: 10, enemyMinStepTicks: 2, bombs: 0 };
 
 test('simulated player is calibrated: about 55 on the old Classic ramp', () => {
   const { median } = summarize(OLD_CLASSIC, 100);

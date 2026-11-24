@@ -25,6 +25,9 @@ export const RULE_TABS = [
     rules: [
       ['startLives', 'Ships', 'Lives at the start of a game.'],
       ['maxShots', 'Shots at once', 'How many of your shots can be on screen together.'],
+      ['bombs', 'Bombs', 'Screen-clearing bombs per game. 0 turns them off.'],
+      ['bombHits', 'Bomb damage', 'Hits a bomb deals to every enemy on screen.'],
+      ['bombClearsBullets', 'Bombs clear bullets', 'A bomb also wipes out enemy bullets.'],
       ['wrapLanes', 'Wrap lanes', 'Moving off the top lane wraps to the bottom, and back.'],
       ['breachCostsLife', 'Breaches cost a life', 'An enemy slipping past you in another lane costs a life.'],
       ['hitFreezeTicks', 'Pause after a hit', 'Ticks the game freezes after you lose a ship.'],

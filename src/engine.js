@@ -34,8 +34,10 @@ export const INT_RULES = {
   enemyBulletStepTicks: [1, 100],
   maxEnemyBullets: [1, 20],
   gunshipPoints: [0, 1000],
+  bombs: [0, 9],
+  bombHits: [1, 99],
 };
-export const BOOL_RULES = ['wrapLanes', 'breachCostsLife', 'shotsCancelBullets'];
+export const BOOL_RULES = ['wrapLanes', 'breachCostsLife', 'shotsCancelBullets', 'bombClearsBullets'];
 export const CHANCE_RULES = ['spawnChance', 'heavyChance', 'gunshipChance'];
 
 export function validateRules(r) {
@@ -90,6 +92,8 @@ function resetRun(s) {
   s.bullets = [];         // enemy bullets, travelling toward the player
   s.score = 0;
   s.lives = s.rules.startLives;
+  s.bombs = s.rules.bombs;
+  s.flash = 0;            // ticks left of a bomb's screen flash (for the renderer)
   s.shotTimer = 0;
   s.enemyTimer = 0;
   s.bulletTimer = 0;
@@ -105,7 +109,7 @@ export function enemyStepTicks(s) {
   );
 }
 
-// Apply a player action immediately. Actions: 'up' | 'down' | 'fire' | 'start'.
+// Apply a player action immediately. Actions: 'up' | 'down' | 'fire' | 'bomb' | 'start'.
 // Returns a list of event names (used for sound, analytics, etc.).
 export function act(s, action) {
   const ev = [];
@@ -141,6 +145,8 @@ export function act(s, action) {
       ev.push('move');
       checkCrash(s, ev);
     }
+  } else if (action === 'bomb') {
+    if (s.bombs > 0) bomb(s, ev);
   } else if (action === 'fire') {
     if (s.shots.length < s.rules.maxShots && !s.shots.some((x) => x.lane === s.lane && x.col === 1)) {
       s.shots.push({ lane: s.lane, col: 1 });
@@ -162,6 +168,7 @@ export function tick(s) {
 
   const r = s.rules;
   s.ticks++;
+  if (s.flash > 0) s.flash--;
 
   // Shots move first, then enemy bullets, then enemies, with a hit check after
   // each move so nothing can pass through anything else.
@@ -259,6 +266,30 @@ function gunshipsFire(s, ev) {
   resolveHits(s, ev); // a bullet fired straight into a shot
 }
 
+// A bomb deals rules.bombHits to every enemy on screen at once, scoring the
+// ones it destroys, and (if the rules say so) wipes out enemy bullets.
+// It reports one 'bomb' event rather than a sound for every kill.
+function bomb(s, ev) {
+  const r = s.rules;
+  s.bombs--;
+  s.flash = 3;
+  const survivors = [];
+  for (const e of s.enemies) {
+    e.hp = (e.hp ?? 1) - r.bombHits;
+    if (e.hp > 0) survivors.push(e);
+    else s.score += killPoints(r, e);
+  }
+  s.enemies = survivors;
+  if (r.bombClearsBullets) s.bullets = [];
+  ev.push('bomb');
+}
+
+function killPoints(r, e) {
+  if (e.kind === 'heavy') return r.heavyPoints;
+  if (e.kind === 'gunship') return r.gunshipPoints;
+  return r.pointsPerKill;
+}
+
 function resolveHits(s, ev) {
   if (s.rules.shotsCancelBullets) {
     for (const shot of s.shots) {
@@ -281,16 +312,8 @@ function resolveHits(s, ev) {
       continue;
     }
     s.enemies.splice(i, 1);
-    if (e.kind === 'heavy') {
-      s.score += s.rules.heavyPoints;
-      ev.push('heavykill');
-    } else if (e.kind === 'gunship') {
-      s.score += s.rules.gunshipPoints;
-      ev.push('gunkill');
-    } else {
-      s.score += s.rules.pointsPerKill;
-      ev.push('kill');
-    }
+    s.score += killPoints(s.rules, e);
+    ev.push(e.kind === 'heavy' ? 'heavykill' : e.kind === 'gunship' ? 'gunkill' : 'kill');
   }
   s.shots = s.shots.filter((x) => !x.dead);
 }
