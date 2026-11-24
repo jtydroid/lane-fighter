@@ -64,6 +64,32 @@ The deploy run for that merge sees a version with no tag yet. It builds the vers
 
 Don't tag releases by hand: Pages won't redeploy a commit it already has, so a hand-made tag on `main`'s current commit can't publish on its own. A version whose tag name is already taken (like `v0.3.0`, which was tagged by hand on the `v0.2.0` code) fails the deploy, so pick the next unused one.
 
+## Balance
+
+`npm run balance` estimates how hard each preset is for a person. It plays 300 games per preset with a simulated player that has human limits:
+- it sees the board 3 ticks (300 ms) late;
+- it presses at most once every 2 ticks (5 presses a second);
+- it hesitates 10% of the time.
+
+It's calibrated to a real player, who reached about 55 points on the old Classic speed ramp (v0.5.0) before it became unplayable. The simulated player gets a median of 56 there. A test keeps it calibrated.
+
+```bash
+npm run balance                                           # every preset
+npm run balance -- --preset gunner                        # one preset
+npm run balance -- --set speedupEveryPoints=15            # try a rule change before voting on it
+npm run balance -- --react 4 --gap 3                      # a slower player
+```
+
+Medians as of v0.6.0, from 300 games per preset:
+
+| Preset | Old ramp (v0.5.0) | v0.6.0 |
+| --- | --- | --- |
+| Classic | 56 | 119 |
+| Warp | 70 | 213 |
+| Gunner | 53 | 90 |
+
+Use it to compare rule sets, not to predict any one person's score.
+
 ## CI/CD
 
 | Workflow | Trigger | What it does |
@@ -96,6 +122,7 @@ Every deploy run has a unique build ID (`<run id>-<attempt>`), stamped into `rel
 | `scripts/build.js` | Builds one copy of the game. Old releases are rebuilt with their own copy, so keep its flags stable. |
 | `scripts/build-all.js` | Builds latest + every release tag into `_site/`. |
 | `scripts/check-site.js` | Smoke check: page, full module graph, expected commit and build. |
+| `scripts/balance.js` | Simulated human player for comparing rule sets (`npm run balance`). |
 | `scripts/release-plan.js` | Prints the tag to release if `package.json`'s version is new. |
 | `test/` | `node --test` suite. |
 
