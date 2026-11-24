@@ -34,11 +34,24 @@
     </div>
   </main>
 
-  <nav class="picker" aria-label="Game version">
-    <label>Version <select id="release-select"><option>Latest</option></select></label>
-    <label>Rules <select id="variant-select"></select></label>
-  </nav>
-  <p class="variant-desc" id="variant-desc"></p>
+  <section class="rules-panel" id="rules-panel" aria-labelledby="rules-title">
+    <div class="rules-top">
+      <h2 id="rules-title">Rules</h2>
+      <label>Preset <select id="variant-select"></select></label>
+      <label>Version <select id="release-select"><option>Latest</option></select></label>
+    </div>
+    <p class="variant-desc" id="variant-desc"></p>
+    <div class="tabs" role="tablist" aria-label="Rule groups" id="rule-tabs"></div>
+    <div id="rule-tabpanels"></div>
+    <p class="rules-errors" id="rules-errors" role="alert" hidden></p>
+    <div class="rules-actions">
+      <span class="rules-status" id="rules-status" aria-live="polite"></span>
+      <button type="button" id="rules-revert" class="ghost-btn">Undo edits</button>
+      <button type="button" id="rules-reset" class="ghost-btn">Reset to preset</button>
+      <button type="button" id="rules-share" class="ghost-btn">Copy link</button>
+      <button type="button" id="rules-apply" class="apply-btn">Apply &amp; restart</button>
+    </div>
+  </section>
 
   <p class="help">↑ ↓ / W S move · Space / Z fire · Enter pause · M sound</p>
 

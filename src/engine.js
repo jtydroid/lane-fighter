@@ -11,7 +11,9 @@ export const PHASE = Object.freeze({
   OVER: 'over',
 });
 
-const INT_RULES = {
+// Rule types and ranges. The rules panel reads these too, so its fields always
+// accept exactly what validateRules accepts.
+export const INT_RULES = {
   lanes: [1, 9],
   columns: [3, 40],
   tickMs: [16, 2000],
@@ -33,8 +35,8 @@ const INT_RULES = {
   maxEnemyBullets: [1, 20],
   gunshipPoints: [0, 1000],
 };
-const BOOL_RULES = ['wrapLanes', 'breachCostsLife', 'shotsCancelBullets'];
-const CHANCE_RULES = ['spawnChance', 'heavyChance', 'gunshipChance'];
+export const BOOL_RULES = ['wrapLanes', 'breachCostsLife', 'shotsCancelBullets'];
+export const CHANCE_RULES = ['spawnChance', 'heavyChance', 'gunshipChance'];
 
 export function validateRules(r) {
   const errors = [];

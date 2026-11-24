@@ -24,9 +24,12 @@ export function bindInput(onAction) {
     el.addEventListener('contextmenu', (e) => e.preventDefault());
   });
 
+  // Keys typed into a form field (the rules panel) are for that field, not the game.
+  const typing = (e) => e.target instanceof Element && e.target.closest('input, select, textarea, .rules-panel');
+
   window.addEventListener('keydown', (e) => {
     const action = KEYS[e.code];
-    if (!action) return;
+    if (!action || typing(e)) return;
     e.preventDefault();
     if (e.repeat) return; // one press = one move, like a real button
     buttons.get(action)?.classList.add('pressed');
