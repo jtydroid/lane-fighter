@@ -43,27 +43,24 @@ turbo: { name: 'Turbo', description: 'Everything is faster.', overrides: { tickM
 
 ### Cut a release
 
-1. Merge a PR that bumps `"version"` in `package.json` (e.g. to `0.2.0`).
-2. Tag that commit on `main`:
+Merge a PR that bumps `"version"` in `package.json` (e.g. to `0.4.0`). That's all.
 
-   ```bash
-   gh release create v0.2.0 --target main --generate-notes
-   ```
+The deploy run for that merge sees a version with no tag yet. It builds the version as `/v/v0.4.0/` next to the older releases, deploys and checks the live site. Only then does it create the `v0.4.0` tag and GitHub release.
 
-The tag push triggers a deploy that adds `/v/v0.2.0/` next to the older releases. The deploy fails if the tag doesn't match `package.json`'s version, so a tag without its bump PR is caught right away.
+Don't tag releases by hand: Pages won't redeploy a commit it already has, so a hand-made tag on `main`'s current commit can't publish on its own. A version whose tag name is already taken (like `v0.3.0`, which was tagged by hand on the `v0.2.0` code) fails the deploy, so pick the next unused one.
 
 ## CI/CD
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
 | `ci.yml` | Pull requests, pushes to non-main branches | Tests, builds the whole site, smoke-checks every version |
-| `deploy.yml` | Push to `main`, push of a `v*` tag, manual | Tests → builds → deploys to GitHub Pages → smoke-checks every version on the **live** URL until it serves this run's build |
+| `deploy.yml` | Push to `main`, manual | Tests → builds → deploys to GitHub Pages → smoke-checks every version on the **live** URL until it serves this run's build → tags and publishes the release if `package.json`'s version is new |
 
 `main` is protected: changes land through PRs that pass CI, squash-merged.
 
 Each build stamps `<release>+<short sha>` onto the faceplate and writes `version.json`. The site root also gets `releases.json`, which lists every frozen release and its variants; the version picker reads it.
 
-Every deploy run has a unique build ID (`<run id>-<attempt>`). It is stamped into `releases.json` and used as the Pages build version, which `scripts/deploy-pages.js` sets in place of `actions/deploy-pages`. The live check waits for that ID. Without it, Pages would skip redeploying a commit it already has (such as a release tag on the commit `main` just deployed), and the check couldn't tell the old site from the new one.
+Every deploy run has a unique build ID (`<run id>-<attempt>`), stamped into `releases.json`. The live check waits for it. If Pages skipped the deploy because it already had that commit (for example, a manual re-run with nothing new), the check fails instead of passing on the old site.
 
 ## Layout
 
@@ -81,7 +78,7 @@ Every deploy run has a unique build ID (`<run id>-<attempt>`). It is stamped int
 | `scripts/build.js` | Builds one copy of the game. Old releases are rebuilt with their own copy, so keep its flags stable. |
 | `scripts/build-all.js` | Builds latest + every release tag into `_site/`. |
 | `scripts/check-site.js` | Smoke check: page, full module graph, expected commit and build. |
-| `scripts/deploy-pages.js` | Publishes the run's Pages artifact with a unique build version (CI only). |
+| `scripts/release-plan.js` | Prints the tag to release if `package.json`'s version is new. |
 | `test/` | `node --test` suite. |
 
 ## Controls

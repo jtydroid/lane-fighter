@@ -25,6 +25,10 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+      - name: Check package.json's version can be released
+        run: |
+          release="$(node scripts/release-plan.js)"
+          echo "${release:+Merging this releases $release}${release:-No new release}"
       - run: npm test
       - run: npm run build
       - name: Smoke-check the built site
