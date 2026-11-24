@@ -23,8 +23,8 @@ export const RULES = Object.freeze({
 
   // Enemies
   enemyStartStepTicks: 7, // ticks per cell an enemy travels at the start
-  enemyMinStepTicks: 2,   // fastest enemies ever get
-  speedupEveryPoints: 10, // enemies get one tick faster every N points
+  enemyMinStepTicks: 3,   // fastest enemies ever get
+  speedupEveryPoints: 25, // enemies get one tick faster every N points
   spawnChance: 0.45,      // chance an enemy spawns each enemy step
   maxEnemies: 6,
   breachCostsLife: true,  // an enemy slipping past in another lane costs a life
