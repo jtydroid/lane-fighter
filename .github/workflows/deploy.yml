@@ -3,21 +3,20 @@ name: Deploy
 # Publishes the whole site to GitHub Pages:
 #   /            latest main
 #   /v/<tag>/    every release tag, frozen, built from its own code
-# Runs when main changes or a release tag is pushed, then smoke-checks every
-# version on the live URL.
+#
+# Releases are automatic: when a push to main carries a package.json version
+# that has no tag yet, this run builds it as /v/v<version>/ too, deploys, checks
+# the live site, and only then creates the tag and GitHub release.
+#
+# Tag pushes don't deploy. Pages skips a commit it has already deployed, so a
+# tag made by hand on main's current commit could never publish on its own.
 on:
   push:
     branches: [main]
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:
   contents: read
-
-env:
-  # Unique per run: stamped into releases.json and used as the Pages build
-  # version (scripts/deploy-pages.js), so redeploying a commit still goes live.
-  BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
 
 # One deploy at a time; never cancel one that is already running.
 concurrency:
@@ -30,33 +29,44 @@ jobs:
     timeout-minutes: 10
     outputs:
       sha: ${{ steps.head.outputs.sha }}
+      build_id: ${{ steps.head.outputs.build_id }}
+      release: ${{ steps.plan.outputs.release }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: main          # the root is always latest main, even on a tag push
+          ref: main          # the root is always latest main
           fetch-depth: 0     # all history and tags, to build every release
       - id: head
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Check the release tag matches package.json
-        if: github.ref_type == 'tag'
-        env:
-          TAG: ${{ github.ref_name }}
+        # build_id is unique per run and stamped into releases.json, so the live
+        # check can tell this deploy from an older one of the same commit.
         run: |
-          version="v$(git show "refs/tags/$TAG:package.json" | node -p 'JSON.parse(require("fs").readFileSync(0)).version')"
-          if [ "$version" != "$TAG" ]; then
-            echo "::error::Tag $TAG points at a commit whose package.json says $version. Bump package.json in a PR first, then tag that commit."
-            exit 1
-          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "build_id=${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+      - name: Is this a new release?
+        id: plan
+        run: |
+          release="$(node scripts/release-plan.js)"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          if [ -n "$release" ]; then
+            echo "New release: $release"
+            # Local only, so build-all includes it. Pushed after the deploy checks out.
+            git tag "$release" HEAD
+          else
+            echo "No new release (v$(node -p 'require("./package.json").version') is already tagged)"
+          fi
       - run: npm test
       - run: npm run build
+        env:
+          BUILD_ID: ${{ steps.head.outputs.build_id }}
       - name: Smoke-check the built site
         run: |
           node scripts/serve.js 8080 _site &
           sleep 1
-          node scripts/check-site.js http://localhost:8080/ --expect-sha "${{ steps.head.outputs.sha }}" --expect-build "$BUILD_ID" --all-releases
+          node scripts/check-site.js http://localhost:8080/ --expect-sha "${{ steps.head.outputs.sha }}" \
+            --expect-build "${{ steps.head.outputs.build_id }}" --all-releases
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
@@ -69,25 +79,14 @@ jobs:
     permissions:
       pages: write
       id-token: write
-      actions: read   # to find this run's Pages artifact
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     outputs:
       page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.build.outputs.sha }}   # same scripts as the build, even on a tag push
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-      # Not actions/deploy-pages: it uses the commit SHA as the Pages build
-      # version, and Pages silently skips a version it already deployed.
       - id: deployment
-        run: node scripts/deploy-pages.js
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+        uses: actions/deploy-pages@v4
 
   verify:
     needs: [build, deploy]
@@ -96,12 +95,30 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ needs.build.outputs.sha }}   # same scripts as the build, even on a tag push
+          ref: ${{ needs.build.outputs.sha }}
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+      # If Pages skipped the deploy (it already had this commit, e.g. a manual
+      # re-run with nothing new), the build ID won't match and this fails.
       - name: Smoke-check every version on the live site
         run: >
           node scripts/check-site.js "${{ needs.deploy.outputs.page_url }}"
-          --expect-sha "${{ needs.build.outputs.sha }}" --expect-build "$BUILD_ID"
+          --expect-sha "${{ needs.build.outputs.sha }}" --expect-build "${{ needs.build.outputs.build_id }}"
           --all-releases --retries 18
+
+  release:
+    needs: [build, verify]
+    if: needs.build.outputs.release != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Tag and publish ${{ needs.build.outputs.release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.release }}
+        run: >
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY"
+          --target "${{ needs.build.outputs.sha }}" --title "$TAG" --generate-notes
