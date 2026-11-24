@@ -4,6 +4,7 @@ const KEYS = {
   ArrowUp: 'up', KeyW: 'up',
   ArrowDown: 'down', KeyS: 'down',
   Space: 'fire', KeyJ: 'fire', KeyZ: 'fire',
+  KeyB: 'bomb', KeyX: 'bomb',
   Enter: 'start', KeyP: 'start', Escape: 'start',
   KeyM: 'mute',
 };

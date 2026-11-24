@@ -17,6 +17,11 @@ export const RULES = Object.freeze({
   wrapLanes: false,       // true: moving up from the top lane wraps to the bottom
   hitFreezeTicks: 15,     // pause after losing a life
 
+  // Bombs: hit every enemy on screen at once.
+  bombs: 3,               // bombs per game (0 = none)
+  bombHits: 2,            // hits a bomb deals to every enemy on screen
+  bombClearsBullets: true, // a bomb also wipes out enemy bullets
+
   // Shots
   maxShots: 1,            // shots allowed on screen at once
   shotStepTicks: 1,       // ticks per cell a shot travels

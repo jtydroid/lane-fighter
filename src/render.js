@@ -34,6 +34,12 @@ const SPRITES = {
     p.moveTo(0.98, 0.22); p.lineTo(0.52, 0.5); p.lineTo(0.98, 0.78);
     p.lineTo(0.98, 0.64); p.lineTo(0.74, 0.5); p.lineTo(0.98, 0.36); p.closePath();
   },
+  // HUD bomb: round body with a fuse.
+  bombIcon(p) {
+    p.arc(0.42, 0.6, 0.32, 0, Math.PI * 2);
+    p.moveTo(0.62, 0.3); p.lineTo(0.72, 0.16); p.lineTo(0.8, 0.22); p.lineTo(0.7, 0.36); p.closePath();
+    p.rect(0.8, 0.06, 0.08, 0.08);
+  },
   bullet(p) {
     p.moveTo(0.26, 0.5); p.lineTo(0.5, 0.28); p.lineTo(0.74, 0.5); p.lineTo(0.5, 0.72); p.closePath();
   },
@@ -239,7 +245,30 @@ export function createRenderer(canvas) {
       ctx.restore();
     }
     if (hud.muted) label('MUTE', W - 14, 46, 'right');
+
+    if (rules.bombs > 0) {
+      label('BOMBS', 252, 8);
+      const n = Math.min(rules.bombs, 6);
+      for (let i = 0; i < n; i++) {
+        const p = new Path2D();
+        SPRITES.bombIcon(p);
+        ctx.save();
+        ctx.translate(252 + 22 * i, 20);
+        ctx.scale(20, 24);
+        ctx.globalAlpha = i < s.bombs ? 1 : GHOST_ALPHA;
+        ctx.fill(p);
+        ctx.restore();
+      }
+    }
     ctx.restore();
+
+    // Bomb blast: the playfield flashes dark and fades over a few ticks.
+    if (s.flash > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.18 * s.flash;
+      ctx.fillRect(PF.x, PF.y, PF.w, PF.h);
+      ctx.restore();
+    }
 
     if (s.phase === PHASE.READY) message(['PRESS FIRE', 'UP/DOWN TO MOVE']);
     else if (s.phase === PHASE.PAUSED) message(['PAUSE', 'PRESS START']);
