@@ -4,6 +4,14 @@ A tiny LCD-handheld-style space shooter. Move between 5 lanes, shoot the enemies
 
 The rules will change over time by audience vote. The real purpose of the project is to exercise build and deploy automation at scale.
 
+## Enemies
+
+| Enemy | Rules | Behaviour |
+| --- | --- | --- |
+| Fighter | all | One cell, one hit, 1 point. |
+| Heavy cruiser | all (from v0.2.0) | Spans two lanes, takes 3 hits (its lit windows count down), 3 points. |
+| Gunship | **Gunner** (from v0.4.0) | Appears from 15 points. Its muzzle flashes (`<`) for 3 ticks, then it fires a bullet back up its lane. Step out of the lane, or shoot the bullet down. One hit, 2 points. |
+
 ## Run
 
 ```bash

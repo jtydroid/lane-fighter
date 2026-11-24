@@ -24,6 +24,19 @@ const SPRITES = {
   shot(p) {
     p.rect(0.2, 0.44, 0.6, 0.12);
   },
+  // Gunship = enemy body + cannon prongs.
+  cannon(p) {
+    p.rect(0.0, 0.22, 0.34, 0.08);
+    p.rect(0.0, 0.7, 0.34, 0.08);
+  },
+  // Muzzle flash, lit in the cell in front of a gunship while it warns.
+  muzzle(p) {
+    p.moveTo(0.98, 0.22); p.lineTo(0.52, 0.5); p.lineTo(0.98, 0.78);
+    p.lineTo(0.98, 0.64); p.lineTo(0.74, 0.5); p.lineTo(0.98, 0.36); p.closePath();
+  },
+  bullet(p) {
+    p.moveTo(0.26, 0.5); p.lineTo(0.5, 0.28); p.lineTo(0.74, 0.5); p.lineTo(0.5, 0.72); p.closePath();
+  },
 };
 
 // Heavy cruiser hull in a tall unit box (spans two lanes). The hit-point
@@ -161,12 +174,19 @@ export function createRenderer(canvas, rules) {
     }
     ctx.restore();
 
-    // Ghost segments
+    // Ghost segments. Gunship segments are only printed on screens that have them.
+    const gunships = rules.gunshipChance > 0;
     for (let lane = 0; lane < rules.lanes; lane++) {
       sprite('ship', 0, lane, false);
+      if (gunships) sprite('bullet', 0, lane, false);
       for (let col = 1; col < rules.columns; col++) {
         sprite('enemy', col, lane, false);
         sprite('shot', col, lane, false);
+        if (gunships) {
+          sprite('bullet', col, lane, false);
+          sprite('cannon', col, lane, false);
+          if (col < rules.columns - 1) sprite('muzzle', col, lane, false);
+        }
       }
     }
 
@@ -183,8 +203,13 @@ export function createRenderer(canvas, rules) {
     for (const e of s.enemies) {
       if (e.kind === 'heavy') heavy(e);
       else sprite('enemy', e.col, e.lane, true);
+      if (e.kind === 'gunship') {
+        sprite('cannon', e.col, e.lane, true);
+        if (e.warn) sprite('muzzle', e.col - 1, e.lane, true);
+      }
     }
     for (const x of s.shots) sprite('shot', x.col, x.lane, true);
+    for (const b of s.bullets ?? []) sprite('bullet', b.col, b.lane, true);
 
     // HUD
     label('SCORE', 14, 8);

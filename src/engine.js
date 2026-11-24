@@ -26,8 +26,15 @@ const INT_RULES = {
   pointsPerKill: [0, 1000],
   heavyHits: [1, 99],
   heavyPoints: [0, 1000],
+  gunshipMinScore: [0, 100000],
+  gunshipFireEveryTicks: [2, 1000],
+  gunshipTelegraphTicks: [1, 100],  // at least 1: every enemy shot is warned
+  enemyBulletStepTicks: [1, 100],
+  maxEnemyBullets: [1, 20],
+  gunshipPoints: [0, 1000],
 };
-const BOOL_RULES = ['wrapLanes', 'breachCostsLife'];
+const BOOL_RULES = ['wrapLanes', 'breachCostsLife', 'shotsCancelBullets'];
+const CHANCE_RULES = ['spawnChance', 'heavyChance', 'gunshipChance'];
 
 export function validateRules(r) {
   const errors = [];
@@ -40,11 +47,13 @@ export function validateRules(r) {
   for (const key of BOOL_RULES) {
     if (typeof r[key] !== 'boolean') errors.push(`${key} must be a boolean, got ${r[key]}`);
   }
-  if (typeof r.spawnChance !== 'number' || !(r.spawnChance >= 0 && r.spawnChance <= 1)) {
-    errors.push(`spawnChance must be a number in [0, 1], got ${r.spawnChance}`);
+  for (const key of CHANCE_RULES) {
+    if (typeof r[key] !== 'number' || !(r[key] >= 0 && r[key] <= 1)) {
+      errors.push(`${key} must be a number in [0, 1], got ${r[key]}`);
+    }
   }
-  if (typeof r.heavyChance !== 'number' || !(r.heavyChance >= 0 && r.heavyChance <= 1)) {
-    errors.push(`heavyChance must be a number in [0, 1], got ${r.heavyChance}`);
+  if (r.gunshipTelegraphTicks >= r.gunshipFireEveryTicks) {
+    errors.push('gunshipTelegraphTicks must be less than gunshipFireEveryTicks');
   }
   if (r.heavyChance > 0 && r.lanes < 2) {
     errors.push('heavy cruisers span two lanes, so heavyChance > 0 needs lanes >= 2');
@@ -76,10 +85,12 @@ function resetRun(s) {
   s.lane = Math.floor(s.rules.lanes / 2);
   s.enemies = [];
   s.shots = [];
+  s.bullets = [];         // enemy bullets, travelling toward the player
   s.score = 0;
   s.lives = s.rules.startLives;
   s.shotTimer = 0;
   s.enemyTimer = 0;
+  s.bulletTimer = 0;
   s.freeze = 0;
   s.ticks = 0;
 }
@@ -150,14 +161,25 @@ export function tick(s) {
   const r = s.rules;
   s.ticks++;
 
-  // Shots move first, then enemies, with a hit check after each so the two
-  // can never pass through each other.
+  // Shots move first, then enemy bullets, then enemies, with a hit check after
+  // each move so nothing can pass through anything else.
   if (++s.shotTimer >= r.shotStepTicks) {
     s.shotTimer = 0;
     for (const shot of s.shots) shot.col++;
     s.shots = s.shots.filter((x) => x.col < r.columns);
     resolveHits(s, ev);
   }
+
+  if (s.bullets.length && ++s.bulletTimer >= r.enemyBulletStepTicks) {
+    s.bulletTimer = 0;
+    for (const b of s.bullets) b.col--;
+    s.bullets = s.bullets.filter((b) => b.col >= 0);
+    resolveHits(s, ev);
+    checkCrash(s, ev);
+    if (s.phase !== PHASE.PLAYING) return ev;
+  }
+
+  gunshipsFire(s, ev);
 
   if (++s.enemyTimer >= enemyStepTicks(s)) {
     s.enemyTimer = 0;
@@ -183,6 +205,8 @@ export function tick(s) {
 // Enemy kinds:
 //   fighter  one cell, destroyed by one hit
 //   heavy    spans `lane` and `lane + 1`, destroyed after rules.heavyHits hits
+//   gunship  one cell, one hit; fires bullets back up its lane. `charge` counts
+//            ticks toward its next shot, and `warn` is true while it blinks.
 export function occupies(e, lane, col) {
   return e.col === col && (e.lane === lane || (e.kind === 'heavy' && e.lane + 1 === lane));
 }
@@ -197,16 +221,53 @@ function spawn(s, ev) {
   if (random(s) >= r.spawnChance) return;
   const col = r.columns - 1;
   const heavy = r.heavyChance > 0 && random(s) < r.heavyChance;
-  const enemy = heavy
-    ? { kind: 'heavy', lane: Math.floor(random(s) * (r.lanes - 1)), col, hp: r.heavyHits }
-    : { kind: 'fighter', lane: Math.floor(random(s) * r.lanes), col, hp: 1 };
+  // Only roll for a gunship when they're on, so rules without them keep the
+  // exact same random sequence (and so the same games) as before they existed.
+  const gunship = !heavy && r.gunshipChance > 0 && s.score >= r.gunshipMinScore && random(s) < r.gunshipChance;
+  let enemy;
+  if (heavy) enemy = { kind: 'heavy', lane: Math.floor(random(s) * (r.lanes - 1)), col, hp: r.heavyHits };
+  else if (gunship) enemy = { kind: 'gunship', lane: Math.floor(random(s) * r.lanes), col, hp: 1, charge: 0, warn: false };
+  else enemy = { kind: 'fighter', lane: Math.floor(random(s) * r.lanes), col, hp: 1 };
   const lanes = heavy ? [enemy.lane, enemy.lane + 1] : [enemy.lane];
   if (lanes.some((lane) => enemyAt(s, lane, col) >= 0)) return;
   s.enemies.push(enemy);
-  ev.push(heavy ? 'spawn-heavy' : 'spawn');
+  ev.push(heavy ? 'spawn-heavy' : gunship ? 'spawn-gunship' : 'spawn');
+}
+
+// Each gunship charges toward its next shot. For the last gunshipTelegraphTicks
+// ticks it blinks a warning, then fires a bullet into the cell in front of it.
+// A gunship with no room in front, or with the bullet limit reached, holds its
+// fire (and keeps blinking if it was already warning).
+function gunshipsFire(s, ev) {
+  const r = s.rules;
+  for (const g of s.enemies) {
+    if (g.kind !== 'gunship') continue;
+    if (g.charge < r.gunshipFireEveryTicks) g.charge++;
+    const wasWarning = g.warn;
+    g.warn = g.col >= 2 && g.charge >= r.gunshipFireEveryTicks - r.gunshipTelegraphTicks;
+    if (g.warn && !wasWarning) ev.push('warn');
+    if (g.warn && g.charge >= r.gunshipFireEveryTicks && s.bullets.length < r.maxEnemyBullets) {
+      s.bullets.push({ lane: g.lane, col: g.col - 1 });
+      if (s.bullets.length === 1) s.bulletTimer = 0;
+      g.charge = 0;
+      g.warn = false;
+      ev.push('enemy-fire');
+    }
+  }
+  resolveHits(s, ev); // a bullet fired straight into a shot
 }
 
 function resolveHits(s, ev) {
+  if (s.rules.shotsCancelBullets) {
+    for (const shot of s.shots) {
+      const b = s.bullets.find((b) => b.lane === shot.lane && b.col === shot.col);
+      if (!b) continue;
+      shot.dead = b.dead = true;
+      ev.push('cancel');
+    }
+    s.bullets = s.bullets.filter((b) => !b.dead);
+    s.shots = s.shots.filter((x) => !x.dead);
+  }
   for (const shot of s.shots) {
     const i = enemyAt(s, shot.lane, shot.col);
     if (i < 0) continue;
@@ -221,6 +282,9 @@ function resolveHits(s, ev) {
     if (e.kind === 'heavy') {
       s.score += s.rules.heavyPoints;
       ev.push('heavykill');
+    } else if (e.kind === 'gunship') {
+      s.score += s.rules.gunshipPoints;
+      ev.push('gunkill');
     } else {
       s.score += s.rules.pointsPerKill;
       ev.push('kill');
@@ -231,6 +295,7 @@ function resolveHits(s, ev) {
 
 function checkCrash(s, ev) {
   if (enemyAt(s, s.lane, 0) >= 0) loseLife(s, ev, 'crash');
+  else if (s.bullets.some((b) => b.lane === s.lane && b.col === 0)) loseLife(s, ev, 'shot');
 }
 
 function loseLife(s, ev, cause) {
@@ -238,6 +303,7 @@ function loseLife(s, ev, cause) {
   s.lastHit = cause;
   s.enemies = [];
   s.shots = [];
+  s.bullets = [];
   s.phase = PHASE.HIT;
   s.freeze = s.rules.hitFreezeTicks;
   ev.push('hit', cause);
@@ -248,6 +314,7 @@ function endFreeze(s, ev) {
   s.freeze = 0;
   s.shotTimer = 0;
   s.enemyTimer = 0;
+  s.bulletTimer = 0;
   if (s.lives <= 0) {
     s.phase = PHASE.OVER;
     ev.push('gameover');
