@@ -45,9 +45,9 @@ test('no params means plain Classic', () => {
 });
 
 test('URL overrides apply on top of the preset', () => {
-  const r = rulesFromParams(params('variant=gunner&enemyMinStepTicks=4&speedupEveryPoints=25'));
+  const r = rulesFromParams(params('variant=gunner&enemyMinStepTicks=4&speedupEveryPoints=40'));
   assert.equal(r.variant.id, 'gunner');
-  assert.deepEqual(r.overrides, { enemyMinStepTicks: 4, speedupEveryPoints: 25 });
+  assert.deepEqual(r.overrides, { enemyMinStepTicks: 4, speedupEveryPoints: 40 });
   assert.equal(r.rules.enemyMinStepTicks, 4);
   assert.equal(r.rules.gunshipChance, VARIANTS.gunner.overrides.gunshipChance);
   assert.ok(Object.isFrozen(r.rules));
