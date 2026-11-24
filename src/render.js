@@ -58,7 +58,7 @@ const SEGMENTS = {
   5: 'acdfg', 6: 'acdefg', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg', ' ': '',
 };
 
-export function createRenderer(canvas, rules) {
+export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d');
   let scale = 1;
 
@@ -71,8 +71,18 @@ export function createRenderer(canvas, rules) {
   new ResizeObserver(resize).observe(canvas);
   resize();
 
-  const cw = PF.w / rules.columns;
-  const ch = PF.h / rules.lanes;
+  // Layout depends on the rules (lanes, columns, heavyHits), which can change
+  // when the player applies custom rules, so it's recomputed when they do.
+  let rules = null;
+  let cw = 0;
+  let ch = 0;
+  let windows = [];
+  function layout(r) {
+    rules = r;
+    cw = PF.w / r.columns;
+    ch = PF.h / r.lanes;
+    windows = heavyWindows(r.heavyHits);
+  }
 
   function sprite(name, col, lane, lit) {
     const size = Math.min(cw, ch) * 0.92;
@@ -87,8 +97,6 @@ export function createRenderer(canvas, rules) {
     ctx.fill(p, 'evenodd');
     ctx.restore();
   }
-
-  const windows = heavyWindows(rules.heavyHits);
 
   function heavy(e) {
     const size = Math.min(cw, ch) * 0.92;
@@ -151,6 +159,7 @@ export function createRenderer(canvas, rules) {
   }
 
   return function draw(s, hud) {
+    if (s.rules !== rules) layout(s.rules);
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
     // LCD glass

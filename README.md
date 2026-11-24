@@ -33,9 +33,16 @@ The live site serves several games side by side:
 | --- | --- |
 | `/` | **Latest**: the current `main` |
 | `/v/<tag>/` | **Frozen release**: every `v*` git tag, built from *that tag's own code* and kept forever |
-| `?variant=<id>` | **Rule variant** within any of the above, e.g. `/v/v0.1.0/?variant=warp` |
+| `?variant=<id>` | **Rule preset** within any of the above, e.g. `/v/v0.1.0/?variant=warp` |
+| `?<rule>=<value>` | **Custom rules** on top of the preset, e.g. `?variant=gunner&enemyMinStepTicks=4` (from v0.5.0) |
 
-`v0.1.0` is the preserved base game. Players switch with the Version and Rules pickers under the device. High scores are kept separately per release and variant.
+`v0.1.0` is the preserved base game. High scores are kept separately per release and preset, and every different set of custom rules gets its own table.
+
+### Rules panel
+
+Under the device, the **Rules** panel shows every rule in `src/rules.js` on five tabs: Speed, Player, Enemies, Heavy cruisers and Gunships. Pick a preset (a variant) to fill them all in, change any value, and **Apply & restart**. The changes go into the URL, so **Copy link** shares that exact game. Values are checked with the same ranges as `validateRules`, and invalid combinations show an error instead of applying.
+
+Labels, tabs and help text live in `src/rule-meta.js`. A test fails if a rule in `rules.js` isn't on a tab, so a newly voted-in rule always needs an entry there.
 
 **Release tags are protected**: once pushed, a `v*` tag can't be moved or deleted, so a frozen release can't change.
 
@@ -80,7 +87,10 @@ Every deploy run has a unique build ID (`<run id>-<attempt>`), stamped into `rel
 | `src/render.js` | Canvas LCD renderer (ghost segments, 7-segment digits). |
 | `src/input.js` | Keyboard + touch buttons → `up` / `down` / `fire` / `start` / `mute`. |
 | `src/sound.js` | Piezo-style beeps. |
-| `src/picker.js` | Version and rules pickers. |
+| `src/picker.js` | Version picker. |
+| `src/rules-panel.js` | The rules panel: presets, tabs, editing, apply, share. |
+| `src/rule-meta.js` | Each rule's tab, label and help text for the panel. |
+| `src/custom-rules.js` | Custom rules in the URL: parsing, checking, high-score keys. |
 | `src/main.js` | Wires it together; fixed-timestep loop. Exposes `window.__game` / `window.__variant`. |
 | `src/version.js` | Release + version shown on the faceplate; stamped by the build. |
 | `scripts/build.js` | Builds one copy of the game. Old releases are rebuilt with their own copy, so keep its flags stable. |
